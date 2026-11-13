@@ -1,5 +1,8 @@
 using System.Text.Json;
-
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
 public static class SetsAndMaps
 {
     /// <summary>
@@ -9,7 +12,7 @@ public static class SetsAndMaps
     ///
     /// For example, if words was: [am, at, ma, if, fi], we would return :
     ///
-    /// ["am & ma", "if & fi"]
+    /// ["am *&* ma", "if *&* fi"]
     ///
     /// The order of the array does not matter, nor does the order of the specific words in each string in the array.
     /// at would not be returned because ta is not in the list of words.
@@ -22,7 +25,23 @@ public static class SetsAndMaps
     public static string[] FindPairs(string[] words)
     {
         // TODO Problem 1 - ADD YOUR CODE HERE
-        return [];
+        HashSet<string> wordSet = new HashSet<string>(words);
+        List<string> pairs = new List<string>();
+
+        foreach (string word in words)
+        {
+            string reversed = $"{word[1]}{word[0]}";
+
+            if (word != reversed && wordSet.Contains(reversed))
+            {
+                pairs.Add($"{word} & {reversed}");
+
+                wordSet.Remove(word);
+                wordSet.Remove(reversed);
+            }
+        }
+
+        return pairs.ToArray();
     }
 
     /// <summary>
@@ -43,6 +62,17 @@ public static class SetsAndMaps
         {
             var fields = line.Split(",");
             // TODO Problem 2 - ADD YOUR CODE HERE
+
+            string degree = fields[3].Trim();
+
+            if (degrees.ContainsKey(degree))
+            {
+                degrees[degree]++;
+            }
+            else
+            {
+                degrees[degree] = 1;
+            }
         }
 
         return degrees;
@@ -61,13 +91,51 @@ public static class SetsAndMaps
     /// should ignore any spaces.  You should also ignore cases.  For 
     /// example, 'Ab' and 'Ba' should be considered anagrams
     /// 
-    /// Reminder: You can access a letter by index in a string by 
+    /// Reminder: You can access a letter by index in a string by
     /// using the [] notation.
     /// </summary>
     public static bool IsAnagram(string word1, string word2)
     {
         // TODO Problem 3 - ADD YOUR CODE HERE
-        return false;
+
+        word1 = word1.Replace(" ", "").ToLower();
+        word2 = word2.Replace(" ", "").ToLower();
+
+        if (word1.Length != word2.Length)
+        {
+            return false;
+        }
+
+        Dictionary<char, int> letterCounts = new Dictionary<char, int>();
+
+        foreach (char letter in word1)
+        {
+            if (letterCounts.ContainsKey(letter))
+            {
+                letterCounts[letter]++;
+            }
+            else
+            {
+                letterCounts[letter] = 1;
+            }
+        }
+
+        foreach (char letter in word2)
+        {
+            if (!letterCounts.ContainsKey(letter))
+            {
+                return false;
+            }
+
+            letterCounts[letter]--;
+
+            if (letterCounts[letter] < 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -81,7 +149,7 @@ public static class SetsAndMaps
     /// Additional information about the format of the JSON data can be found 
     /// at this website:  
     /// 
-    /// https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
+    /// [https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php)
     /// 
     /// </summary>
     public static string[] EarthquakeDailySummary()
@@ -89,7 +157,11 @@ public static class SetsAndMaps
         const string uri = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
         using var client = new HttpClient();
         using var getRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-        using var jsonStream = client.Send(getRequestMessage).Content.ReadAsStream();
+        using var response = client.Send(getRequestMessage);
+
+        response.EnsureSuccessStatusCode();
+
+        using var jsonStream = response.Content.ReadAsStream();
         using var reader = new StreamReader(jsonStream);
         var json = reader.ReadToEnd();
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -101,6 +173,23 @@ public static class SetsAndMaps
         // on those classes so that the call to Deserialize above works properly.
         // 2. Add code below to create a string out each place a earthquake has happened today and its magitude.
         // 3. Return an array of these string descriptions.
-        return [];
+
+        List<string> earthquakeDescriptions = new List<string>();
+
+        if (featureCollection?.Features != null)
+        {
+            foreach (var feature in featureCollection.Features)
+            {
+                if (feature.Properties != null)
+                {
+                    string place = feature.Properties.Place;
+                    string magnitude = feature.Properties.Mag?.ToString() ?? "Unknown";
+
+                    earthquakeDescriptions.Add($"{place} - Mag {magnitude}");
+                }
+            }
+        }
+
+        return earthquakeDescriptions.ToArray();
     }
 }
